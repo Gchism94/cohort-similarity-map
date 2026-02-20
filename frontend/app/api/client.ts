@@ -49,3 +49,9 @@ export async function getDocDetail(
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function getHerd(runId: number) {
+  const res = await fetch(`${API_BASE}/api/runs/${runId}/herd/`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

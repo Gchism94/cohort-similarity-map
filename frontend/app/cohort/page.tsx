@@ -1,10 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { listDocs, startRun, getRun, getProjection } from "../api/client";
+import { listDocs, startRun, getRun, getProjection, getHerd } from "../api/client";
 import { UploadBox } from "../../components/UploadBox";
 import { ScatterMap } from "../../components/ScatterMap";
 import { DocPanel } from "../../components/DocPanel";
+import { HerdPanel } from "../../components/HerdPanel";
+
+type ViewSection = "doc" | "skills" | "experience";
+type RightTab = "details" | "herd";
 
 export default function CohortPage() {
   const [cohortKey, setCohortKey] = useState("default");
@@ -12,49 +16,120 @@ export default function CohortPage() {
   const [run, setRun] = useState<any>(null);
   const [points, setPoints] = useState<any[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
-  type ViewSection = "doc" | "skills" | "experience";
 
-const [view, setView] = useState<ViewSection>("doc");
+  const [view, setView] = useState<ViewSection>("doc");
+
+  const [tab, setTab] = useState<RightTab>("details");
+  const [herd, setHerd] = useState<any[] | null>(null);
+  const [herdLoading, setHerdLoading] = useState(false);
+  const [herdError, setHerdError] = useState<string | null>(null);
+
   async function refreshDocs() {
     setDocs(await listDocs(cohortKey));
   }
 
-  useEffect(() => { refreshDocs(); }, [cohortKey]);
+  useEffect(() => {
+    refreshDocs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cohortKey]);
 
   async function kickRun() {
     const r = await startRun(cohortKey);
     setRun(r);
     setPoints([]);
     setSelected(null);
+
+    setTab("details");
+    setHerd(null);
+    setHerdError(null);
+    setHerdLoading(false);
   }
 
-  // poll run status while running
+  // Poll run status while running; when done, fetch projection for current view.
+  useEffect(() => {
+    if (!run?.id) return;
+
+    let timer: any = null;
+    let cancelled = false;
+
+    async function poll() {
+      if (cancelled) return;
+
+      const r2 = await getRun(run.id);
+      if (cancelled) return;
+
+      setRun(r2);
+
+      if (r2.status === "done") {
+        const p = await getProjection(run.id, view);
+        if (!cancelled) {
+          setPoints(p);
+          setSelected(null);
+        }
+        return;
+      }
+
+      if (r2.status === "failed") return;
+
+      timer = setTimeout(poll, 1500);
+    }
+
+    // Only poll if not already done/failed
+    if (run.status !== "done" && run.status !== "failed") {
+      poll();
+    }
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [run?.id]); // NOTE: do NOT include `view` here, or it will restart polling on view change
+
+  // If view changes and the run is already done, refetch projection for that section.
   useEffect(() => {
     if (!run?.id) return;
     if (run.status !== "done") return;
+
+    let cancelled = false;
     (async () => {
-        const p = await getProjection(run.id, view);
+      const p = await getProjection(run.id, view);
+      if (!cancelled) {
         setPoints(p);
         setSelected(null);
-    })();
-    }, [run?.id, run?.status, view]);
-    let timer: any;
-
-    async function poll() {
-      const r2 = await getRun(run.id);
-      setRun(r2);
-      if (r2.status === "done") {
-        const p = await getProjection(run.id, view);
-        setPoints(p);
-        return;
       }
-      if (r2.status === "failed") return;
-      timer = setTimeout(poll, 1500);
-    }
-    poll();
+    })();
 
-    return () => timer && clearTimeout(timer);
-  }, [run?.id, view]);
+    return () => {
+      cancelled = true;
+    };
+  }, [run?.id, run?.status, view]);
+
+  // Herd phrases: fetch when run is done AND (tab is herd OR we haven't fetched yet).
+  useEffect(() => {
+    if (!run?.id) return;
+    if (run.status !== "done") return;
+
+    if (tab !== "herd" && herd !== null) return;
+
+    let cancelled = false;
+    (async () => {
+      setHerdLoading(true);
+      setHerdError(null);
+      try {
+        const data = await getHerd(run.id);
+        const bigrams = Array.isArray(data?.bigrams) ? data.bigrams : [];
+        if (!cancelled) setHerd(bigrams);
+      } catch (e: any) {
+        if (!cancelled) setHerdError(e?.message ?? "Failed to load herd phrases");
+      } finally {
+        if (!cancelled) setHerdLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [run?.id, run?.status, tab]);
 
   return (
     <div style={{ padding: 16, maxWidth: 1100, margin: "0 auto" }}>
@@ -62,27 +137,34 @@ const [view, setView] = useState<ViewSection>("doc");
 
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <label>
-            Cohort key:&nbsp;
-            <input value={cohortKey} onChange={(e) => setCohortKey(e.target.value)} />
+          Cohort key:&nbsp;
+          <input value={cohortKey} onChange={(e) => setCohortKey(e.target.value)} />
         </label>
+
         <button onClick={refreshDocs}>Refresh docs</button>
         <button onClick={kickRun}>Start analysis</button>
+
         <label>
-            View:&nbsp;
-            <select value={view} onChange={(e) => setView(e.target.value as ViewSection)}>
+          View:&nbsp;
+          <select value={view} onChange={(e) => setView(e.target.value as ViewSection)}>
             <option value="doc">Full document</option>
             <option value="skills">Skills only</option>
             <option value="experience">Experience only</option>
-            </select>
+          </select>
         </label>
-        </div>
+      </div>
 
       <div style={{ marginTop: 12 }}>
         <UploadBox cohortKey={cohortKey} onUploaded={refreshDocs} />
       </div>
 
       <div style={{ marginTop: 12 }}>
-        <b>Docs:</b> {docs.length} &nbsp; {run ? <>| <b>Run:</b> {run.id} ({run.status})</> : null}
+        <b>Docs:</b> {docs.length} &nbsp;
+        {run ? (
+          <>
+            | <b>Run:</b> {run.id} ({run.status})
+          </>
+        ) : null}
         {run?.error ? <div style={{ color: "crimson" }}>{run.error}</div> : null}
       </div>
 
@@ -90,20 +172,53 @@ const [view, setView] = useState<ViewSection>("doc");
         <div>
           {points.length ? (
             <ScatterMap points={points} onSelect={(id) => setSelected(id)} />
-            ) : (
+          ) : (
             <div style={{ border: "1px dashed #bbb", padding: 24, borderRadius: 8 }}>
-                {run?.status === "done"
+              {run?.status === "done"
                 ? `No points available for view "${view}". Try uploading more documents or switch views.`
                 : "Upload documents and click “Start analysis” to generate the map."}
             </div>
-            )}
+          )}
         </div>
+
         <div>
-          {run?.id ? (
-            <DocPanel runId={run.id} docId={selected} view={view} />
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <button
+              onClick={() => setTab("details")}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 8,
+                border: "1px solid #ddd",
+                background: tab === "details" ? "#f3f3f3" : "white",
+              }}
+            >
+              Details
+            </button>
+
+            <button
+              onClick={() => setTab("herd")}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 8,
+                border: "1px solid #ddd",
+                background: tab === "herd" ? "#f3f3f3" : "white",
+              }}
+              disabled={!run?.id || run.status !== "done"}
+              title={!run?.id || run.status !== "done" ? "Run an analysis to view herd phrases" : ""}
+            >
+              Herd phrases
+            </button>
+          </div>
+
+          {tab === "details" ? (
+            run?.id ? (
+              <DocPanel runId={run.id} docId={selected} section={view} />
             ) : (
-            <div>Start a run to enable details.</div>
-            )}
+              <div>Start a run to enable details.</div>
+            )
+          ) : (
+            <HerdPanel herd={herd} loading={herdLoading} error={herdError} />
+          )}
         </div>
       </div>
     </div>
