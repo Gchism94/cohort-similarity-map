@@ -63,7 +63,68 @@ Postgres + pgvector
 ↓
 UMAP Projection + Clustering
 
-````
+```
+
+``` mermaid
+flowchart LR
+
+subgraph Client
+    A[React / Next.js UI]
+end
+
+subgraph Backend
+    B[Django REST API]
+    C[Celery Worker]
+end
+
+subgraph Processing
+    D[Text Extraction]
+    E[PII Scrubber]
+    F[Sentence Embeddings]
+end
+
+subgraph Storage
+    G[(PostgreSQL + pgvector)]
+end
+
+subgraph Analysis
+    H[UMAP Projection]
+    I[HDBSCAN Clustering]
+end
+
+subgraph Exploration
+    J[Nearest Neighbor Search]
+end
+
+A -->|Upload Resume/Application| B
+B -->|Queue Job| C
+C --> D
+D --> E
+E --> F
+F -->|Store Vectors| G
+G --> H
+H --> I
+I -->|2D Coordinates| G
+G --> J
+J -->|Similarity Results| B
+B -->|Projection + Neighbors| A
+
+```
+
+```mermaid
+flowchart TD
+
+U[User Uploads Document]
+    --> X[Extract Text]
+    --> Y[Scrub PII]
+    --> Z[Generate Embeddings]
+    --> DB[(Store Vector in pgvector)]
+    --> P[UMAP Projection]
+    --> C[Cluster + Outlier Detection]
+    --> V[Interactive Map]
+    --> N[Nearest Neighbor Search]
+
+```
 
 ---
 
