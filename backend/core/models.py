@@ -19,6 +19,7 @@ class AnalysisRun(models.Model):
     umap_params = models.JSONField(default=dict)
     status = models.CharField(max_length=50, default="pending")  # pending/running/done/failed
     error = models.TextField(blank=True, default="")
+    herd_phrases = models.JSONField(default=dict)  # e.g., {"bigrams":[{"phrase":"data analysis","count":42,"doc_freq":18}, ...]}
 
 class Document(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -57,4 +58,3 @@ class DocProjection(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["document", "run", "section"], name="uniq_projection_doc_run_section")
         ]
-        

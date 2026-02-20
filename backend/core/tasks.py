@@ -1,5 +1,7 @@
 # backend/core/tasks.py
 from __future__ import annotations
+from asyn
+from pdb import runcio import run
 import os
 import numpy as np
 from celery import shared_task
@@ -12,6 +14,7 @@ from core.scrub import scrub_pii
 from core.embed import embed_text, l2_norm
 from core.umap_project import project_umap, cluster_and_outliers
 from core.chunking import chunk_sections
+from core.herd import herd_phrases
 
 SECTIONS_FOR_VIEWS = ["doc", "skills", "experience"]  # keep small for now
 
@@ -43,6 +46,10 @@ def run_analysis(run_id: int):
         docs = [d for d in docs if d.status != "failed"]
         if not docs:
             raise RuntimeError("All documents failed extraction")
+        
+        texts = [d.scrubbed_text for d in docs if d.status != "failed"]
+        run.herd_phrases = {"bigrams": herd_phrases(texts, top_n=30)}
+        run.save(update_fields=["herd_phrases"])
 
         # 2) embeddings (per section)
         section_texts = {s: [] for s in SECTIONS_FOR_VIEWS}

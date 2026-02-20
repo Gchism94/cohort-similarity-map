@@ -35,6 +35,7 @@ def upload(request):
     )
     return Response(DocumentSerializer(doc).data)
 
+
 @api_view(["GET"])
 def documents(request):
     cohort_key = request.query_params.get("cohort_key", "default")
@@ -72,3 +73,8 @@ def doc_detail(request, run_id: int, doc_id: int):
     section = request.query_params.get("section", "doc")
     nn = nearest_documents(run_id=run_id, doc_id=doc_id, section=section, k=int(request.query_params.get("k", 5)))
     return Response({"doc_id": doc_id, "section": section, "neighbors": nn})
+
+@api_view(["GET"])
+def herd(request, run_id: int):
+    run = AnalysisRun.objects.get(id=run_id)
+    return Response(run.herd_phrases or {})
