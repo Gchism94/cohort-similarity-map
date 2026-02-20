@@ -2,6 +2,15 @@
 from django.db import models
 from pgvector.django import VectorField
 
+SECTION_CHOICES = [
+    ("doc", "Full Document"),
+    ("skills", "Skills"),
+    ("experience", "Experience"),
+    ("projects", "Projects"),
+    ("education", "Education"),
+    ("other", "Other"),
+]
+
 class AnalysisRun(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     cohort_key = models.CharField(max_length=200, default="default")
@@ -23,15 +32,29 @@ class Document(models.Model):
     error = models.TextField(blank=True, default="")
 
 class DocEmbedding(models.Model):
-    document = models.OneToOneField(Document, on_delete=models.CASCADE, related_name="embedding")
-    run = models.ForeignKey(AnalysisRun, on_delete=models.CASCADE, related_name="embeddings")
-    vector = VectorField(dimensions=384)  # all-MiniLM-L6-v2 = 384
+    document = models.ForeignKey("Document", on_delete=models.CASCADE, related_name="embeddings")
+    run = models.ForeignKey("AnalysisRun", on_delete=models.CASCADE, related_name="embeddings")
+    section = models.CharField(max_length=20, choices=SECTION_CHOICES, default="doc")
+    vector = VectorField(dimensions=384)
     norm = models.FloatField(default=0.0)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["document", "run", "section"], name="uniq_embedding_doc_run_section")
+        ]
+
+
 class DocProjection(models.Model):
-    document = models.OneToOneField(Document, on_delete=models.CASCADE, related_name="projection")
-    run = models.ForeignKey(AnalysisRun, on_delete=models.CASCADE, related_name="projections")
+    document = models.ForeignKey("Document", on_delete=models.CASCADE, related_name="projections")
+    run = models.ForeignKey("AnalysisRun", on_delete=models.CASCADE, related_name="projections")
+    section = models.CharField(max_length=20, choices=SECTION_CHOICES, default="doc")
     x = models.FloatField()
     y = models.FloatField()
     cluster_id = models.IntegerField(null=True, blank=True)
     outlier_score = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["document", "run", "section"], name="uniq_projection_doc_run_section")
+        ]
+        
