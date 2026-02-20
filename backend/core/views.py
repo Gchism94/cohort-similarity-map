@@ -1,16 +1,19 @@
 # backend/core/views.py
 from __future__ import annotations
 import os
+import shutil
 from django.conf import settings
 from django.core.files.storage import default_storage
+from django.db import transaction
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-from core.models import Document, AnalysisRun, DocProjection
+from core.models import Document, AnalysisRun, DocProjection, AuditEvent
 from core.serializers import DocumentSerializer, AnalysisRunSerializer, ProjectionPointSerializer
 from core.tasks import run_analysis
 from core.neighbor import nearest_documents
+
 
 @api_view(["POST"])
 def upload(request):
@@ -78,3 +81,29 @@ def doc_detail(request, run_id: int, doc_id: int):
 def herd(request, run_id: int):
     run = AnalysisRun.objects.get(id=run_id)
     return Response(run.herd_phrases or {})
+
+@api_view(["DELETE"])
+def delete_cohort(request, cohort_key: str):
+    # (Optional) capture actor: IP for now
+    actor = request.META.get("REMOTE_ADDR", "")
+
+    docs = Document.objects.filter(cohort_key=cohort_key)
+    n_docs = docs.count()
+
+    # delete files on disk
+    cohort_dir = os.path.join(settings.MEDIA_ROOT, cohort_key)
+    if os.path.isdir(cohort_dir):
+        shutil.rmtree(cohort_dir, ignore_errors=True)
+
+    with transaction.atomic():
+        # delete DB rows (embeddings/projections cascade)
+        docs.delete()
+        AnalysisRun.objects.filter(cohort_key=cohort_key).delete()
+        AuditEvent.objects.create(
+            action="cohort_delete",
+            cohort_key=cohort_key,
+            actor=actor,
+            detail={"documents_deleted": n_docs},
+        )
+
+    return Response({"cohort_key": cohort_key, "documents_deleted": n_docs})

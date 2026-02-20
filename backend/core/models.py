@@ -58,3 +58,11 @@ class DocProjection(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["document", "run", "section"], name="uniq_projection_doc_run_section")
         ]
+
+# backend/core/models.py
+class AuditEvent(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    action = models.CharField(max_length=100)  # e.g., "cohort_delete", "upload", "run_start"
+    cohort_key = models.CharField(max_length=200, default="default")
+    detail = models.JSONField(default=dict)    # flexible payload
+    actor = models.CharField(max_length=200, blank=True, default="")  # later: user id/email/ip
