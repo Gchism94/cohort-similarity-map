@@ -63,3 +63,19 @@ export async function deleteCohort(cohortKey: string) {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function listRuns(cohortKey: string) {
+  const res = await fetch(`${API_BASE}/api/runs/?cohort_key=${encodeURIComponent(cohortKey)}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function rerun(runId: number, umapParams: { n_neighbors: number; min_dist: number }, label?: string) {
+  const res = await fetch(`${API_BASE}/api/runs/${runId}/rerun/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ umap_params: umapParams, label }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
