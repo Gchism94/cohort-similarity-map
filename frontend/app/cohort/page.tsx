@@ -1,11 +1,19 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { listDocs, startRun, getRun, getProjection, getHerd } from "../api/client";
+import {
+  listDocs,
+  startRun,
+  getRun,
+  getProjection,
+  getHerd,
+  deleteCohort,
+} from "../api/client";
 import { UploadBox } from "../../components/UploadBox";
 import { ScatterMap } from "../../components/ScatterMap";
 import { DocPanel } from "../../components/DocPanel";
 import { HerdPanel } from "../../components/HerdPanel";
+import { DangerConfirm } from "../../components/DangerConfirm";
 
 type ViewSection = "doc" | "skills" | "experience";
 type RightTab = "details" | "herd";
@@ -24,11 +32,50 @@ export default function CohortPage() {
   const [herdLoading, setHerdLoading] = useState(false);
   const [herdError, setHerdError] = useState<string | null>(null);
 
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const canDelete = (docs.length > 0 || run !== null) && !deleteBusy;
+
   async function refreshDocs() {
-    setDocs(await listDocs(cohortKey));
+    try {
+      const d = await listDocs(cohortKey);
+      setDocs(d);
+    } catch (e: any) {
+      // Optional: you could add a docsError state; for now, just keep UI stable.
+      console.error("Failed to refresh docs:", e);
+    }
+  }
+
+  async function handleDeleteCohort() {
+    if (!canDelete) return;
+
+    setDeleteBusy(true);
+    setDeleteError(null);
+
+    try {
+      await deleteCohort(cohortKey);
+
+      // Clear all UI state tied to the cohort
+      setDocs([]);
+      setRun(null);
+      setPoints([]);
+      setSelected(null);
+
+      setTab("details");
+      setHerd(null);
+      setHerdError(null);
+      setHerdLoading(false);
+    } catch (e: any) {
+      setDeleteError(e?.message ?? "Failed to delete cohort");
+    } finally {
+      setDeleteBusy(false);
+    }
   }
 
   useEffect(() => {
+    // Clear stale delete error when switching cohorts
+    setDeleteError(null);
     refreshDocs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cohortKey]);
@@ -74,7 +121,6 @@ export default function CohortPage() {
       timer = setTimeout(poll, 1500);
     }
 
-    // Only poll if not already done/failed
     if (run.status !== "done" && run.status !== "failed") {
       poll();
     }
@@ -83,7 +129,8 @@ export default function CohortPage() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [run?.id]); // NOTE: do NOT include `view` here, or it will restart polling on view change
+    // NOTE: don't include `view` here, or polling restarts on view change
+  }, [run?.id]);
 
   // If view changes and the run is already done, refetch projection for that section.
   useEffect(() => {
@@ -135,7 +182,7 @@ export default function CohortPage() {
     <div style={{ padding: 16, maxWidth: 1100, margin: "0 auto" }}>
       <h1>Cohort Similarity Map</h1>
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <label>
           Cohort key:&nbsp;
           <input value={cohortKey} onChange={(e) => setCohortKey(e.target.value)} />
@@ -152,7 +199,23 @@ export default function CohortPage() {
             <option value="experience">Experience only</option>
           </select>
         </label>
+
+        {/* UX safety: disable delete unless cohort actually has something */}
+        <div style={{ opacity: canDelete ? 1 : 0.6 }}>
+          <DangerConfirm
+            label="Delete cohort"
+            warningTitle="Delete cohort permanently"
+            warningBody={`This will permanently delete ALL uploaded documents, embeddings, projections, and runs for cohort "${cohortKey}". This cannot be undone.`}
+            confirmPhrase={`delete ${cohortKey}`}
+            onConfirm={handleDeleteCohort}
+            busy={deleteBusy}
+          />
+        </div>
       </div>
+
+      {deleteError ? (
+        <div style={{ marginTop: 10, color: "crimson" }}>{deleteError}</div>
+      ) : null}
 
       <div style={{ marginTop: 12 }}>
         <UploadBox cohortKey={cohortKey} onUploaded={refreshDocs} />

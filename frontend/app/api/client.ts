@@ -55,3 +55,11 @@ export async function getHerd(runId: number) {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function deleteCohort(cohortKey: string) {
+  const res = await fetch(`${API_BASE}/api/cohorts/${encodeURIComponent(cohortKey)}/`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
