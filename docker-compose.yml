@@ -1,0 +1,58 @@
+# docker-compose.yml
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: cohortmap
+      POSTGRES_USER: cohortmap
+      POSTGRES_PASSWORD: cohortmap
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  backend:
+    build: ./backend
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DATABASE_URL: postgres://cohortmap:cohortmap@db:5432/cohortmap
+      REDIS_URL: redis://redis:6379/0
+    ports: ["8000:8000"]
+    depends_on: [db, redis]
+    volumes:
+      - ./backend:/app
+      - uploads:/app/uploads
+    command: >
+      bash -lc "
+      python manage.py migrate &&
+      python manage.py runserver 0.0.0.0:8000
+      "
+
+  worker:
+    build: ./backend
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DATABASE_URL: postgres://cohortmap:cohortmap@db:5432/cohortmap
+      REDIS_URL: redis://redis:6379/0
+    depends_on: [backend, redis, db]
+    volumes:
+      - ./backend:/app
+      - uploads:/app/uploads
+    command: celery -A config.celery app worker -l INFO
+
+  frontend:
+    build: ./frontend
+    ports: ["3000:3000"]
+    depends_on: [backend]
+    volumes:
+      - ./frontend:/app
+    environment:
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
+    command: npm run dev -- --hostname 0.0.0.0 --port 3000
+
+volumes:
+  pgdata:
+  uploads:
