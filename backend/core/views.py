@@ -30,7 +30,7 @@ def upload(request):
     # Save under cohort folder; Django may rename to avoid collisions
     stored_rel_path = default_storage.save(os.path.join(cohort_key, f.name), f)
 
-    stored_abs_path = os.path.join(settings.MEDIA_ROOT, stored_rel_path)
+    #stored_abs_path = os.path.join(settings.MEDIA_ROOT, stored_rel_path)
     stored_name = os.path.basename(stored_rel_path)
 
     doc = Document.objects.create(
@@ -39,7 +39,7 @@ def upload(request):
         original_filename=f.name,       # student-visible
         stored_name=stored_name,        # actual stored file name
         content_type=getattr(f, "content_type", "") or "",
-        file_path=stored_abs_path,
+        file_path=stored_rel_path,
         status="uploaded",
     )
 

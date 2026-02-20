@@ -1,8 +1,9 @@
 # backend/core/urls.py
-from django.urls import path
+from django.urls import path, include
 from core import views
 
 urlpatterns = [
+    path("api/", include("core.urls")),
     path("upload/", views.upload),
     path("documents/", views.documents),
 
