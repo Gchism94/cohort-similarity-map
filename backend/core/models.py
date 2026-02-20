@@ -20,6 +20,8 @@ class AnalysisRun(models.Model):
     status = models.CharField(max_length=50, default="pending")  # pending/running/done/failed
     error = models.TextField(blank=True, default="")
     herd_phrases = models.JSONField(default=dict)  # e.g., {"bigrams":[{"phrase":"data analysis","count":42,"doc_freq":18}, ...]}
+    label = models.CharField(max_length=200, blank=True, default="")
+    parent_run = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="children")
 
 class Document(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)

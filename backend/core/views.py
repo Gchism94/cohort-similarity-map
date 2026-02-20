@@ -107,3 +107,32 @@ def delete_cohort(request, cohort_key: str):
         )
 
     return Response({"cohort_key": cohort_key, "documents_deleted": n_docs})
+
+@api_view(["GET"])
+def list_runs(request):
+    cohort_key = request.query_params.get("cohort_key", "default")
+    qs = AnalysisRun.objects.filter(cohort_key=cohort_key).order_by("-created_at")
+    return Response(AnalysisRunSerializer(qs, many=True).data)
+
+@api_view(["POST"])
+def rerun(request, run_id: int):
+    base = AnalysisRun.objects.get(id=run_id)
+    umap_params = request.data.get("umap_params", base.umap_params)
+    label = request.data.get("label", f"rerun of {run_id}")
+
+    run = AnalysisRun.objects.create(
+        cohort_key=base.cohort_key,
+        embedding_model=base.embedding_model,
+        chunking_version=base.chunking_version,
+        umap_params=umap_params,
+        parent_run=base,
+        label=label,
+        status="pending",
+    )
+    AuditEvent.objects.create(
+        action="run_rerun",
+        cohort_key=run.cohort_key,
+        detail={"base_run_id": base.id, "new_run_id": run.id, "umap_params": umap_params},
+    )
+    run_analysis.delay(run.id)
+    return Response(AnalysisRunSerializer(run).data)
