@@ -31,6 +31,13 @@ const [view, setView] = useState<ViewSection>("doc");
   // poll run status while running
   useEffect(() => {
     if (!run?.id) return;
+    if (run.status !== "done") return;
+    (async () => {
+        const p = await getProjection(run.id, view);
+        setPoints(p);
+        setSelected(null);
+    })();
+    }, [run?.id, run?.status, view]);
     let timer: any;
 
     async function poll() {
@@ -82,16 +89,14 @@ const [view, setView] = useState<ViewSection>("doc");
       <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
         <div>
           {points.length ? (
-            <ScatterMap
-            points={points}
-            view={view}
-            onSelect={(id) => setSelected(id)}
-            />
-          ) : (
+            <ScatterMap points={points} onSelect={(id) => setSelected(id)} />
+            ) : (
             <div style={{ border: "1px dashed #bbb", padding: 24, borderRadius: 8 }}>
-              Upload documents and click “Start analysis” to generate the map.
+                {run?.status === "done"
+                ? `No points available for view "${view}". Try uploading more documents or switch views.`
+                : "Upload documents and click “Start analysis” to generate the map."}
             </div>
-          )}
+            )}
         </div>
         <div>
           {run?.id ? (
