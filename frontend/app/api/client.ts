@@ -31,14 +31,21 @@ export async function getRun(runId: number) {
   return res.json();
 }
 
-export async function getProjection(runId: number) {
-  const res = await fetch(`${API_BASE}/api/runs/${runId}/projection/`);
+export async function getProjection(runId: number, section: "doc" | "skills" | "experience" = "doc") {
+  const res = await fetch(`${API_BASE}/api/runs/${runId}/projection/?section=${encodeURIComponent(section)}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export async function getDocDetail(runId: number, docId: number) {
-  const res = await fetch(`${API_BASE}/api/runs/${runId}/doc/${docId}/?k=5`);
+export async function getDocDetail(
+  runId: number,
+  docId: number,
+  section: "doc" | "skills" | "experience" = "doc",
+  k: number = 5
+) {
+  const res = await fetch(
+    `${API_BASE}/api/runs/${runId}/doc/${docId}/?k=${k}&section=${encodeURIComponent(section)}`
+  );
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

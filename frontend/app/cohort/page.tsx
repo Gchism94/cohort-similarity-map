@@ -12,7 +12,9 @@ export default function CohortPage() {
   const [run, setRun] = useState<any>(null);
   const [points, setPoints] = useState<any[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
+  type ViewSection = "doc" | "skills" | "experience";
 
+const [view, setView] = useState<ViewSection>("doc");
   async function refreshDocs() {
     setDocs(await listDocs(cohortKey));
   }
@@ -35,7 +37,7 @@ export default function CohortPage() {
       const r2 = await getRun(run.id);
       setRun(r2);
       if (r2.status === "done") {
-        const p = await getProjection(run.id);
+        const p = await getProjection(run.id, view);
         setPoints(p);
         return;
       }
@@ -45,7 +47,7 @@ export default function CohortPage() {
     poll();
 
     return () => timer && clearTimeout(timer);
-  }, [run?.id]);
+  }, [run?.id, view]);
 
   return (
     <div style={{ padding: 16, maxWidth: 1100, margin: "0 auto" }}>
@@ -53,12 +55,20 @@ export default function CohortPage() {
 
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <label>
-          Cohort key:&nbsp;
-          <input value={cohortKey} onChange={(e) => setCohortKey(e.target.value)} />
+            Cohort key:&nbsp;
+            <input value={cohortKey} onChange={(e) => setCohortKey(e.target.value)} />
         </label>
         <button onClick={refreshDocs}>Refresh docs</button>
         <button onClick={kickRun}>Start analysis</button>
-      </div>
+        <label>
+            View:&nbsp;
+            <select value={view} onChange={(e) => setView(e.target.value as ViewSection)}>
+            <option value="doc">Full document</option>
+            <option value="skills">Skills only</option>
+            <option value="experience">Experience only</option>
+            </select>
+        </label>
+        </div>
 
       <div style={{ marginTop: 12 }}>
         <UploadBox cohortKey={cohortKey} onUploaded={refreshDocs} />
@@ -72,7 +82,11 @@ export default function CohortPage() {
       <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
         <div>
           {points.length ? (
-            <ScatterMap points={points} onSelect={(id) => setSelected(id)} />
+            <ScatterMap
+            points={points}
+            view={view}
+            onSelect={(id) => setSelected(id)}
+            />
           ) : (
             <div style={{ border: "1px dashed #bbb", padding: 24, borderRadius: 8 }}>
               Upload documents and click “Start analysis” to generate the map.
@@ -80,7 +94,11 @@ export default function CohortPage() {
           )}
         </div>
         <div>
-          {run?.id ? <DocPanel runId={run.id} docId={selected} /> : <div>Start a run to enable details.</div>}
+          {run?.id ? (
+            <DocPanel runId={run.id} docId={selected} view={view} />
+            ) : (
+            <div>Start a run to enable details.</div>
+            )}
         </div>
       </div>
     </div>
