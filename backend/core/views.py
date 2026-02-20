@@ -63,10 +63,12 @@ def run_status(request, run_id: int):
 
 @api_view(["GET"])
 def projection(request, run_id: int):
-    pts = DocProjection.objects.filter(run_id=run_id).select_related("document")
+    section = request.query_params.get("section", "doc")
+    pts = DocProjection.objects.filter(run_id=run_id, section=section).select_related("document")
     return Response(ProjectionPointSerializer(pts, many=True).data)
 
 @api_view(["GET"])
 def doc_detail(request, run_id: int, doc_id: int):
-    nn = nearest_documents(run_id=run_id, doc_id=doc_id, k=int(request.query_params.get("k", 5)))
-    return Response({"doc_id": doc_id, "neighbors": nn})
+    section = request.query_params.get("section", "doc")
+    nn = nearest_documents(run_id=run_id, doc_id=doc_id, section=section, k=int(request.query_params.get("k", 5)))
+    return Response({"doc_id": doc_id, "section": section, "neighbors": nn})
