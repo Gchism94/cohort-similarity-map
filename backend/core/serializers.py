@@ -5,7 +5,16 @@ from core.models import Document, AnalysisRun, DocProjection
 class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
-        fields = ["id", "created_at", "cohort_key", "filename", "status", "error"]
+        fields = [
+            "id",
+            "cohort_key",
+            "filename",
+            "original_filename",
+            "stored_name",
+            "content_type",
+            "status",
+            "created_at",
+        ]
 
 class AnalysisRunSerializer(serializers.ModelSerializer):
     class Meta:

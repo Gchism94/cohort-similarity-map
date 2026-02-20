@@ -19,23 +19,30 @@ from core.neighbor import nearest_documents
 def upload(request):
     cohort_key = request.data.get("cohort_key", "default")
     f = request.FILES.get("file")
+
     if not f:
         return Response({"error": "Missing file"}, status=status.HTTP_400_BAD_REQUEST)
 
-    rel_path = os.path.join("uploads", cohort_key, f.name)
-    abs_path = os.path.join(settings.MEDIA_ROOT, cohort_key)
-    os.makedirs(abs_path, exist_ok=True)
+    # Ensure cohort folder exists under MEDIA_ROOT
+    cohort_dir = os.path.join(settings.MEDIA_ROOT, cohort_key)
+    os.makedirs(cohort_dir, exist_ok=True)
 
-    saved_path = default_storage.save(os.path.join(cohort_key, f.name), f)
-    file_path = os.path.join(settings.MEDIA_ROOT, saved_path)
+    # Save under cohort folder; Django may rename to avoid collisions
+    stored_rel_path = default_storage.save(os.path.join(cohort_key, f.name), f)
+
+    stored_abs_path = os.path.join(settings.MEDIA_ROOT, stored_rel_path)
+    stored_name = os.path.basename(stored_rel_path)
 
     doc = Document.objects.create(
         cohort_key=cohort_key,
-        filename=f.name,
+        filename=f.name,                # keep for compatibility if serializer expects it
+        original_filename=f.name,       # student-visible
+        stored_name=stored_name,        # actual stored file name
         content_type=getattr(f, "content_type", "") or "",
-        file_path=file_path,
+        file_path=stored_abs_path,
         status="uploaded",
     )
+
     return Response(DocumentSerializer(doc).data)
 
 
@@ -55,7 +62,7 @@ def start_run(request):
         cohort_key=cohort_key,
         embedding_model=embedding_model,
         umap_params=umap_params,
-        status="pending",
+        status="queued",
     )
     run_analysis.delay(run.id)
     return Response(AnalysisRunSerializer(run).data)
@@ -127,7 +134,7 @@ def rerun(request, run_id: int):
         umap_params=umap_params,
         parent_run=base,
         label=label,
-        status="pending",
+        status="queued",
     )
     AuditEvent.objects.create(
         action="run_rerun",
