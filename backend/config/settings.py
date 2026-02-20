@@ -6,8 +6,10 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-secret-key")
-DEBUG = True
-ALLOWED_HOSTS = ["*"]
+
+DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
+
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
@@ -36,11 +38,21 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = []
 WSGI_APPLICATION = "config.wsgi.application"
 
-DATABASES = {"default": dj_database_url.config(default=os.environ["DATABASE_URL"])}
+DATABASES = {
+    "default": dj_database_url.config(conn_max_age=600, ssl_require=True)
+}
 
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS: lock down in prod
+CORS_ALLOW_ALL_ORIGINS = os.environ.get("CORS_ALLOW_ALL_ORIGINS", "0") == "1"
+CORS_ALLOWED_ORIGINS = (
+    os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
+    if os.environ.get("CORS_ALLOWED_ORIGINS")
+    else []
+)
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "uploads"
 
