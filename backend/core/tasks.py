@@ -11,6 +11,9 @@ from core.text_extract import extract_text
 from core.scrub import scrub_pii
 from core.embed import embed_text, l2_norm
 from core.umap_project import project_umap, cluster_and_outliers
+from core.chunking import chunk_sections
+
+SECTIONS_FOR_VIEWS = ["doc", "skills", "experience"]  # keep small for now
 
 @shared_task
 def run_analysis(run_id: int):
@@ -41,30 +44,48 @@ def run_analysis(run_id: int):
         if not docs:
             raise RuntimeError("All documents failed extraction")
 
-        # 2) embeddings
-        vectors = []
-        kept_docs = []
-        for d in docs:
-            vec = embed_text(run.embedding_model, d.scrubbed_text[:12000])  # guard huge docs
-            vectors.append(vec)
-            kept_docs.append(d)
+        # 2) embeddings (per section)
+        section_texts = {s: [] for s in SECTIONS_FOR_VIEWS}
+        section_docs  = {s: [] for s in SECTIONS_FOR_VIEWS}
 
-        V = np.vstack(vectors)  # shape (n, dim)
+        for d in docs:
+            chunks = chunk_sections(d.scrubbed_text[:20000])  # guard
+            for s in SECTIONS_FOR_VIEWS:
+                t = chunks.get(s, "")
+                if t:
+                    section_texts[s].append(t)
+                    section_docs[s].append(d)
 
         with transaction.atomic():
-            # clean old for run
             DocEmbedding.objects.filter(run=run).delete()
             DocProjection.objects.filter(run=run).delete()
 
-            for d, vec in zip(kept_docs, V):
-                DocEmbedding.objects.create(
-                    document=d,
-                    run=run,
-                    vector=vec.tolist(),
-                    norm=l2_norm(vec),
-                )
-                d.status = "embedded"
-                d.save(update_fields=["status"])
+        for s in SECTIONS_FOR_VIEWS:
+            texts = section_texts[s]
+            docs_s = section_docs[s]
+            if len(docs_s) < 5:
+                continue
+
+            vectors = [embed_text(run.embedding_model, t[:12000]) for t in texts]
+            V = np.vstack(vectors)
+
+            with transaction.atomic():
+                for d, vec in zip(docs_s, V):
+                    DocEmbedding.objects.create(
+                        document=d, run=run, section=s,
+                        vector=vec.tolist(), norm=l2_norm(vec)
+                    )
+
+            coords = project_umap(V, run.umap_params or {})
+            labels, outlier = cluster_and_outliers(coords)
+
+            with transaction.atomic():
+                for d, (x, y), lab, sc in zip(docs_s, coords, labels, outlier):
+                    DocProjection.objects.create(
+                        document=d, run=run, section=s,
+                        x=float(x), y=float(y),
+                        cluster_id=int(lab), outlier_score=float(sc)
+                    )
 
         # 3) UMAP projection
         coords = project_umap(V, run.umap_params or {})
