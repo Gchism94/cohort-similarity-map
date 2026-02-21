@@ -11,10 +11,11 @@ def project_umap(vectors: np.ndarray, params: dict) -> np.ndarray:
         metric=str(params.get("metric", "cosine")),
         random_state=int(params.get("random_state", 42)),
     )
-    return reducer.fit_transform(vectors)
+    return reducer.fit_transform(vectors).astype(np.float32)
 
 def cluster_and_outliers(coords: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    clusterer = hdbscan.HDBSCAN(min_cluster_size=5)
+    min_cluster_size = max(3, min(10, coords.shape[0] // 5))
+    clusterer = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size)
     labels = clusterer.fit_predict(coords)
 
     # Outlier score: use HDBSCAN outlier scores if present, else zeros
