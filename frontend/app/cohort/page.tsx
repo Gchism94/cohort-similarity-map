@@ -16,6 +16,7 @@ import { ScatterMap } from "../components/ScatterMap";
 import { DocPanel } from "../components/DocPanel";
 import { HerdPanel } from "../components/HerdPanel";
 import { DangerConfirm } from "../components/DangerConfirm";
+import { Card, Button, Input, Select, Label, Tabs, Badge } from "../components/ui";
 
 type ViewSection = "doc" | "skills" | "experience";
 type RightTab = "details" | "herd";
@@ -51,35 +52,11 @@ export default function CohortPage() {
   const canDelete = (docs.length > 0 || run !== null) && !deleteBusy;
 
   function statusBadge(status?: string) {
-    const map: Record<string, { icon: string; color: string; label: string }> = {
-      queued: { icon: "⚪", color: "#888", label: "queued" },
-      running: { icon: "🟡", color: "#b58900", label: "running" },
-      done: { icon: "🟢", color: "#2e7d32", label: "done" },
-      failed: { icon: "🔴", color: "#c62828", label: "failed" },
-    };
-
-    const s = status ? map[status] : undefined;
-    if (!s) return <span style={{ color: "#888" }}>—</span>;
-
-    return (
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 4,
-          fontSize: 12,
-          padding: "2px 6px",
-          borderRadius: 6,
-          border: "1px solid #eee",
-          color: s.color,
-        }}
-        title={s.label}
-      >
-        <span>{s.icon}</span>
-        <span>{s.label}</span>
-      </span>
-    );
-  }
+      if (!status) return <span className="text-neutral-500">—</span>;
+      const tone = status === "done" ? "good" : status === "running" ? "warn" : status === "failed" ? "bad" : "neutral";
+      const icon = status === "done" ? "🟢" : status === "running" ? "🟡" : status === "failed" ? "🔴" : "⚪";
+      return <Badge tone={tone}>{icon} {status}</Badge>;
+    }
 
   function syncUmapInputsFromRun(r: any) {
     const nn = Number(r?.umap_params?.n_neighbors);
@@ -318,106 +295,152 @@ export default function CohortPage() {
   const meta = formatRunMeta(run);
 
   return (
-    <div style={{ padding: 16, maxWidth: 1100, margin: "0 auto" }}>
-      <h1>Cohort Similarity Map</h1>
+  <div className="min-h-screen bg-neutral-950 text-neutral-100">
+    {/* Header */}
+    <header className="sticky top-0 z-10 border-b border-neutral-800 bg-neutral-950/80 backdrop-blur">
+      <div className="mx-auto max-w-6xl px-6 py-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight">Cohort Similarity Map</h1>
+            <p className="text-xs text-neutral-400">
+              Upload resumes → embed → UMAP projection → inspect clusters & herd phrases
+            </p>
+          </div>
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <label>
-          Cohort key:&nbsp;
-          <input value={cohortKey} onChange={(e) => setCohortKey(e.target.value)} />
-        </label>
+          <div className="flex items-center gap-2 flex-wrap">
+            {run ? (
+              <div className="flex items-center gap-2">
+                {statusBadge(run.status)}
+                <Badge>
+                  Run #{run.id}
+                </Badge>
+              </div>
+            ) : (
+              <span className="text-xs text-neutral-500">No run selected</span>
+            )}
+          </div>
+        </div>
 
-        <button onClick={refreshDocs}>Refresh docs</button>
-        <button onClick={kickRun}>Start analysis</button>
+        {/* Controls row */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+          <div className="md:col-span-3">
+            <Label>Cohort key</Label>
+            <Input value={cohortKey} onChange={(e) => setCohortKey(e.target.value)} placeholder="default" />
+          </div>
 
-        <label>
-          Run:&nbsp;
-          <select
-            value={run?.id ?? ""}
-            onChange={(e) => selectRun(Number(e.target.value))}
-            disabled={runsLoading || runs.length === 0}
-          >
-            <option value="" disabled>
-              {runsLoading ? "Loading runs..." : runs.length ? "Select a run" : "No runs yet"}
-            </option>
-            {runs.map((r) => (
-              <option key={r.id} value={r.id}>
-                #{r.id} [{r.status}] {r.label ? `— ${r.label}` : ""}
+          <div className="md:col-span-3">
+            <Label>Run</Label>
+            <Select
+              value={run?.id ?? ""}
+              onChange={(e) => selectRun(Number(e.target.value))}
+              disabled={runsLoading || runs.length === 0}
+            >
+              <option value="" disabled>
+                {runsLoading ? "Loading runs..." : runs.length ? "Select a run" : "No runs yet"}
               </option>
-            ))}
-          </select>
-        </label>
+              {runs.map((r) => (
+                <option key={r.id} value={r.id}>
+                  #{r.id} [{r.status}] {r.label ? `— ${r.label}` : ""}
+                </option>
+              ))}
+            </Select>
+          </div>
 
-        {run ? <span style={{ marginLeft: 6 }}>{statusBadge(run.status)}</span> : null}
+          <div className="md:col-span-2">
+            <Label>View</Label>
+            <Select value={view} onChange={(e) => setView(e.target.value as ViewSection)}>
+              <option value="doc">Full document</option>
+              <option value="skills">Skills only</option>
+              <option value="experience">Experience only</option>
+            </Select>
+          </div>
 
-        <label>
-          View:&nbsp;
-          <select value={view} onChange={(e) => setView(e.target.value as ViewSection)}>
-            <option value="doc">Full document</option>
-            <option value="skills">Skills only</option>
-            <option value="experience">Experience only</option>
-          </select>
-        </label>
+          <div className="md:col-span-2">
+            <Label>n_neighbors</Label>
+            <Input
+              type="number"
+              min={2}
+              max={200}
+              value={umapNeighbors}
+              onChange={(e) => setUmapNeighbors(Number(e.target.value))}
+              disabled={!run?.id}
+            />
+          </div>
 
-        <label>
-          n_neighbors:&nbsp;
-          <input
-            type="number"
-            min={2}
-            max={200}
-            value={umapNeighbors}
-            onChange={(e) => setUmapNeighbors(Number(e.target.value))}
-            style={{ width: 80 }}
-            disabled={!run?.id}
-          />
-        </label>
+          <div className="md:col-span-2">
+            <Label>min_dist</Label>
+            <Input
+              type="number"
+              step={0.01}
+              min={0}
+              max={1}
+              value={umapMinDist}
+              onChange={(e) => setUmapMinDist(Number(e.target.value))}
+              disabled={!run?.id}
+            />
+          </div>
 
-        <label>
-          min_dist:&nbsp;
-          <input
-            type="number"
-            step={0.01}
-            min={0}
-            max={1}
-            value={umapMinDist}
-            onChange={(e) => setUmapMinDist(Number(e.target.value))}
-            style={{ width: 80 }}
-            disabled={!run?.id}
-          />
-        </label>
+          <div className="md:col-span-12 flex items-center gap-2 flex-wrap pt-1">
+            <Button onClick={refreshDocs} variant="ghost">Refresh docs</Button>
+            <Button onClick={kickRun}>Start analysis</Button>
 
-        <button
-          onClick={handleRerun}
-          disabled={!run?.id || run.status !== "done" || rerunBusy}
-          title={
-            !run?.id
-              ? "Select a run first"
-              : run.status !== "done"
-              ? "Run must finish before rerunning with new UMAP params"
-              : ""
-          }
-        >
-          {rerunBusy ? "Rerunning..." : "Rerun"}
-        </button>
+            <Button
+              onClick={handleRerun}
+              disabled={!run?.id || run.status !== "done" || rerunBusy}
+              title={
+                !run?.id
+                  ? "Select a run first"
+                  : run.status !== "done"
+                  ? "Run must finish before rerunning with new UMAP params"
+                  : ""
+              }
+            >
+              {rerunBusy ? "Rerunning..." : "Rerun"}
+            </Button>
 
-        {/* UX safety: disable delete unless cohort actually has something */}
-        <div style={{ opacity: canDelete ? 1 : 0.6 }}>
-          <DangerConfirm
-            label="Delete cohort"
-            warningTitle="Delete cohort permanently"
-            warningBody={`This will permanently delete ALL uploaded documents, embeddings, projections, and runs for cohort "${cohortKey}". This cannot be undone.`}
-            confirmPhrase={`delete ${cohortKey}`}
-            onConfirm={handleDeleteCohort}
-            busy={deleteBusy}
-          />
+            <div className={canDelete ? "" : "opacity-60"}>
+              <div className="mt-4 border-t border-red-900/30 pt-4">
+                <DangerConfirm
+                  label="Delete cohort"
+                  warningTitle="Delete cohort permanently"
+                  warningBody={`This will permanently delete ALL uploaded documents, embeddings, projections, and runs for cohort "${cohortKey}". This cannot be undone.`}
+                  confirmPhrase={`delete ${cohortKey}`}
+                  onConfirm={handleDeleteCohort}
+                  busy={deleteBusy}
+                />
+              </div>
+            </div>
+
+            {/* Errors in a consistent style */}
+            {runsError ? <span className="text-sm text-red-300">{runsError}</span> : null}
+            {rerunError ? <span className="text-sm text-red-300">{rerunError}</span> : null}
+            {deleteError ? <span className="text-sm text-red-300">{deleteError}</span> : null}
+          </div>
         </div>
       </div>
+    </header>
 
-      {runsError ? <div style={{ marginTop: 10, color: "crimson" }}>{runsError}</div> : null}
-      {rerunError ? <div style={{ marginTop: 10, color: "crimson" }}>{rerunError}</div> : null}
-      {deleteError ? <div style={{ marginTop: 10, color: "crimson" }}>{deleteError}</div> : null}
-
-      <div style={{ marginTop: 12 }}>
+    {/* Main */}
+    <main className="mx-auto max-w-6xl p-6 space-y-4">
+      {run?.id ? (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-3">
+          <div className="flex items-center gap-2">
+            {statusBadge(run.status)}
+            <span className="text-sm text-neutral-200">
+              Run <span className="text-neutral-100 font-medium">#{run.id}</span>
+            </span>
+            {meta ? (
+              <span className="text-xs text-neutral-500">
+                · {meta.model} · nn={meta.nn} md={meta.md}
+              </span>
+            ) : null}
+          </div>
+          <div className="text-xs text-neutral-400">
+            {run.status === "running" ? "Processing…" : run.status === "queued" ? "Queued…" : run.status === "done" ? "Ready" : "Failed"}
+          </div>
+        </div>
+      ) : null}
+      <Card title="Upload documents">
         <UploadBox
           cohortKey={cohortKey}
           onUploaded={async () => {
@@ -425,85 +448,100 @@ export default function CohortPage() {
             await refreshRuns();
           }}
         />
-      </div>
+      </Card>
 
-      <div style={{ marginTop: 12 }}>
-        <b>Docs:</b> {docs.length} &nbsp;
-        {run ? (
-          <>
-            | <b>Run:</b> {run.id} {statusBadge(run.status)}
-          </>
-        ) : null}
-        {run?.error ? <div style={{ color: "crimson" }}>{run.error}</div> : null}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Scatter */}
+        <div className="lg:col-span-2">
+          <Card
+            title="Projection"
+            right={
+              <span className="text-xs text-neutral-400">
+                Docs: <span className="text-neutral-200">{docs.length}</span>
+                {run ? (
+                  <>
+                    {" "}· Run: <span className="text-neutral-200">#{run.id}</span>
+                  </>
+                ) : null}
+              </span>
+            }
+          >
+            {meta ? (
+              <div className="mb-3 text-xs text-neutral-400 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <span className="text-neutral-500">Created</span>
+                  <div className="text-neutral-200">{meta.created}</div>
+                </div>
+                <div>
+                  <span className="text-neutral-500">Embedding</span>
+                  <div className="text-neutral-200">{meta.model}</div>
+                </div>
+                <div>
+                  <span className="text-neutral-500">UMAP</span>
+                  <div className="text-neutral-200">nn={meta.nn}, md={meta.md}</div>
+                </div>
+              </div>
+            ) : null}
 
-        {meta ? (
-          <div style={{ marginTop: 6, fontSize: 13, color: "#444" }}>
-            <div>
-              <b>Created:</b> {meta.created}
-            </div>
-            <div>
-              <b>Embedding model:</b> {meta.model}
-            </div>
-            <div>
-              <b>UMAP:</b> n_neighbors={meta.nn}, min_dist={meta.md}
-            </div>
-          </div>
-        ) : null}
-      </div>
+            {run?.error ? <div className="mb-3 text-sm text-red-300">{run.error}</div> : null}
 
-      <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
-        <div>
-          {points.length ? (
-            <ScatterMap points={points} onSelect={(id) => setSelected(id)} />
-          ) : (
-            <div style={{ border: "1px dashed #bbb", padding: 24, borderRadius: 8 }}>
-              {run?.status === "done"
-                ? `No points available for view "${view}". Try uploading more documents or switch views.`
-                : "Upload documents and click “Start analysis” to generate the map."}
-            </div>
-          )}
-        </div>
-
-        <div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-            <button
-              onClick={() => setTab("details")}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 8,
-                border: "1px solid #ddd",
-                background: tab === "details" ? "#f3f3f3" : "white",
-              }}
-            >
-              Details
-            </button>
-
-            <button
-              onClick={() => setTab("herd")}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 8,
-                border: "1px solid #ddd",
-                background: tab === "herd" ? "#f3f3f3" : "white",
-              }}
-              disabled={!run?.id || run.status !== "done"}
-              title={!run?.id || run.status !== "done" ? "Run an analysis to view herd phrases" : ""}
-            >
-              Herd phrases
-            </button>
-          </div>
-
-          {tab === "details" ? (
-            run?.id ? (
-              <DocPanel runId={run.id} docId={selected} section={view} />
+            {points.length ? (
+              <div className="h-[640px] rounded-xl overflow-hidden border border-neutral-800 bg-neutral-950/30">
+                <ScatterMap points={points} onSelect={(id) => setSelected(id)} />
+              </div>
             ) : (
-              <div>Start a run to enable details.</div>
-            )
-          ) : (
-            <HerdPanel herd={herd} loading={herdLoading} error={herdError} />
-          )}
+              <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-950/30 p-10 text-sm text-neutral-400">
+                {run?.status === "done"
+                  ? `No points available for view "${view}". Try uploading more documents or switch views.`
+                  : "Upload documents and click “Start analysis” to generate the map."}
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Right panel */}
+        <div className="lg:col-span-1 space-y-4">
+          <Card
+            title="Inspector"
+            right={
+              run?.id ? (
+                <span className="text-xs text-neutral-400">Selected: {selected ?? "—"}</span>
+              ) : (
+                <span className="text-xs text-neutral-500">Start a run to enable</span>
+              )
+            }
+            className="h-[640px] flex flex-col"
+          >
+            <div className="shrink-0">
+              <Tabs
+                value={tab}
+                onChange={(v) => setTab(v as RightTab)}
+                options={[
+                  { value: "details", label: "Details" },
+                  {
+                    value: "herd",
+                    label: "Herd phrases",
+                    disabled: !run?.id || run.status !== "done",
+                    title: !run?.id || run.status !== "done" ? "Run an analysis to view herd phrases" : "",
+                  },
+                ]}
+              />
+            </div>
+
+            <div className="mt-4 grow overflow-auto pr-1">
+              {tab === "details" ? (
+                run?.id ? (
+                  <DocPanel runId={run.id} docId={selected} section={view} />
+                ) : (
+                  <div className="text-sm text-neutral-400">Start a run to enable details.</div>
+                )
+              ) : (
+                <HerdPanel herd={herd} loading={herdLoading} error={herdError} />
+              )}
+            </div>
+          </Card>
         </div>
       </div>
-    </div>
-  );
-}
+    </main>
+  </div>
+);

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { Button, Input, cx } from "../components/ui";
 
 export function DangerConfirm({
   label,
@@ -9,6 +10,7 @@ export function DangerConfirm({
   confirmPhrase,
   onConfirm,
   busy,
+  className,
 }: {
   label: string;
   warningTitle: string;
@@ -16,6 +18,7 @@ export function DangerConfirm({
   confirmPhrase: string;
   onConfirm: () => Promise<void>;
   busy: boolean;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
@@ -23,92 +26,61 @@ export function DangerConfirm({
   const canConfirm = text.trim() === confirmPhrase && !busy;
 
   return (
-    <div>
-      <button
+    <div className={cx("inline-block", className)}>
+      <Button
+        variant="danger"
         onClick={() => setOpen(true)}
-        style={{
-          padding: "6px 10px",
-          borderRadius: 8,
-          border: "1px solid #f0b4b4",
-          background: "#fff5f5",
-          color: "#b42318",
-          fontWeight: 600,
-        }}
+        disabled={busy}
         title="Danger: irreversible"
       >
         {label}
-      </button>
+      </Button>
 
       {open ? (
-        <div
-          style={{
-            marginTop: 10,
-            border: "1px solid #f0b4b4",
-            background: "#fff5f5",
-            borderRadius: 12,
-            padding: 12,
-          }}
-        >
-          <div style={{ fontWeight: 800, color: "#b42318", marginBottom: 6 }}>
-            {warningTitle}
-          </div>
-          <div style={{ fontSize: 13, color: "#7a271a", marginBottom: 10 }}>
-            {warningBody}
+        <div className="mt-3 rounded-2xl border border-red-900/40 bg-red-500/10 p-4">
+          <div className="text-sm font-semibold text-red-200">{warningTitle}</div>
+          <div className="mt-2 text-sm text-red-200/80">{warningBody}</div>
+
+          <div className="mt-4 text-xs text-red-200/80">
+            Type <span className="font-semibold text-red-100">{confirmPhrase}</span> to confirm.
           </div>
 
-          <div style={{ fontSize: 12, color: "#7a271a", marginBottom: 6 }}>
-            Type <b>{confirmPhrase}</b> to confirm.
-          </div>
-
-          <input
+          <Input
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={confirmPhrase}
-            style={{
-              width: "100%",
-              padding: "8px 10px",
-              borderRadius: 8,
-              border: "1px solid #f0b4b4",
-              marginBottom: 10,
-            }}
             disabled={busy}
+            className="mt-2 border-red-900/40 focus:ring-red-400/30"
           />
 
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <Button
+              variant="ghost"
               onClick={() => {
                 setOpen(false);
                 setText("");
               }}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 8,
-                border: "1px solid #ddd",
-                background: "white",
-              }}
               disabled={busy}
             >
               Cancel
-            </button>
+            </Button>
 
-            <button
+            <Button
+              variant="danger"
               onClick={async () => {
                 await onConfirm();
                 setOpen(false);
                 setText("");
               }}
               disabled={!canConfirm}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 8,
-                border: "1px solid #b42318",
-                background: canConfirm ? "#b42318" : "#f0b4b4",
-                color: "white",
-                fontWeight: 700,
-              }}
+              className={cx(
+                canConfirm
+                  ? "bg-red-600/80 hover:bg-red-600 text-white border border-red-700/60"
+                  : "bg-red-500/20 text-red-200 border border-red-900/30 hover:bg-red-500/20"
+              )}
             >
               {busy ? "Deleting..." : "Delete permanently"}
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
