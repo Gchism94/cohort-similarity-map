@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { uploadFile } from "../app/api/client";
+import { uploadFile } from "../api/client";
 
 export function UploadBox({ cohortKey, onUploaded }: { cohortKey: string; onUploaded: () => void }) {
   const [busy, setBusy] = useState(false);

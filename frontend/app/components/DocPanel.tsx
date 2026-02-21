@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { getDocDetail } from "../app/api/client";
+import { getDocDetail } from "../api/client";
 
 type Section = "doc" | "skills" | "experience";
 
