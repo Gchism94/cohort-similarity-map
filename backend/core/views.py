@@ -1,8 +1,6 @@
 # backend/core/views.py
 from __future__ import annotations
-import os
-import shutil
-from django.conf import settings
+
 from django.core.files.storage import default_storage
 from django.db import transaction
 from rest_framework.decorators import api_view
@@ -10,39 +8,40 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from core.models import Document, AnalysisRun, DocProjection, AuditEvent
-from core.serializers import DocumentSerializer, AnalysisRunSerializer, ProjectionPointSerializer
+from core.serializers import (
+    DocumentSerializer,
+    AnalysisRunSerializer,
+    ProjectionPointSerializer,
+)
 from core.tasks import run_analysis
 from core.neighbor import nearest_documents
+
+
+@api_view(["GET"])
+def health(request):
+    return Response({"status": "ok"})
 
 
 @api_view(["POST"])
 def upload(request):
     cohort_key = request.data.get("cohort_key", "default")
     f = request.FILES.get("file")
-
     if not f:
         return Response({"error": "Missing file"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Ensure cohort folder exists under MEDIA_ROOT
-    cohort_dir = os.path.join(settings.MEDIA_ROOT, cohort_key)
-    os.makedirs(cohort_dir, exist_ok=True)
-
-    # Save under cohort folder; Django may rename to avoid collisions
-    stored_rel_path = default_storage.save(os.path.join(cohort_key, f.name), f)
-
-    #stored_abs_path = os.path.join(settings.MEDIA_ROOT, stored_rel_path)
-    stored_name = os.path.basename(stored_rel_path)
+    # Save under cohort prefix; works for local filesystem or S3 via default_storage
+    stored_rel_path = default_storage.save(f"{cohort_key}/{f.name}", f)
+    stored_name = stored_rel_path.split("/")[-1]
 
     doc = Document.objects.create(
         cohort_key=cohort_key,
-        filename=f.name,                # keep for compatibility if serializer expects it
-        original_filename=f.name,       # student-visible
-        stored_name=stored_name,        # actual stored file name
+        filename=f.name,  # compatibility
+        original_filename=f.name,
+        stored_name=stored_name,
         content_type=getattr(f, "content_type", "") or "",
         file_path=stored_rel_path,
         status="uploaded",
     )
-
     return Response(DocumentSerializer(doc).data)
 
 
@@ -52,11 +51,17 @@ def documents(request):
     qs = Document.objects.filter(cohort_key=cohort_key).order_by("-created_at")
     return Response(DocumentSerializer(qs, many=True).data)
 
+
 @api_view(["POST"])
 def start_run(request):
     cohort_key = request.data.get("cohort_key", "default")
-    embedding_model = request.data.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2")
-    umap_params = request.data.get("umap_params", {"n_neighbors": 15, "min_dist": 0.1, "metric": "cosine", "random_state": 42})
+    embedding_model = request.data.get(
+        "embedding_model", "sentence-transformers/all-MiniLM-L6-v2"
+    )
+    umap_params = request.data.get(
+        "umap_params",
+        {"n_neighbors": 15, "min_dist": 0.1, "metric": "cosine", "random_state": 42},
+    )
 
     run = AnalysisRun.objects.create(
         cohort_key=cohort_key,
@@ -67,43 +72,55 @@ def start_run(request):
     run_analysis.delay(run.id)
     return Response(AnalysisRunSerializer(run).data)
 
+
 @api_view(["GET"])
 def run_status(request, run_id: int):
     run = AnalysisRun.objects.get(id=run_id)
     return Response(AnalysisRunSerializer(run).data)
 
+
 @api_view(["GET"])
 def projection(request, run_id: int):
     section = request.query_params.get("section", "doc")
-    pts = DocProjection.objects.filter(run_id=run_id, section=section).select_related("document")
+    pts = (
+        DocProjection.objects.filter(run_id=run_id, section=section)
+        .select_related("document")
+        .order_by("id")
+    )
     return Response(ProjectionPointSerializer(pts, many=True).data)
+
 
 @api_view(["GET"])
 def doc_detail(request, run_id: int, doc_id: int):
     section = request.query_params.get("section", "doc")
-    nn = nearest_documents(run_id=run_id, doc_id=doc_id, section=section, k=int(request.query_params.get("k", 5)))
+    k = int(request.query_params.get("k", 5))
+    nn = nearest_documents(run_id=run_id, doc_id=doc_id, section=section, k=k)
     return Response({"doc_id": doc_id, "section": section, "neighbors": nn})
+
 
 @api_view(["GET"])
 def herd(request, run_id: int):
     run = AnalysisRun.objects.get(id=run_id)
     return Response(run.herd_phrases or {})
 
+
 @api_view(["DELETE"])
 def delete_cohort(request, cohort_key: str):
-    # (Optional) capture actor: IP for now
     actor = request.META.get("REMOTE_ADDR", "")
 
     docs = Document.objects.filter(cohort_key=cohort_key)
     n_docs = docs.count()
 
-    # delete files on disk
-    cohort_dir = os.path.join(settings.MEDIA_ROOT, cohort_key)
-    if os.path.isdir(cohort_dir):
-        shutil.rmtree(cohort_dir, ignore_errors=True)
+    # Delete stored files via default_storage (works for local or S3)
+    for d in docs.only("file_path"):
+        if d.file_path:
+            try:
+                default_storage.delete(d.file_path)
+            except Exception:
+                # Keep going; DB deletion still proceeds
+                pass
 
     with transaction.atomic():
-        # delete DB rows (embeddings/projections cascade)
         docs.delete()
         AnalysisRun.objects.filter(cohort_key=cohort_key).delete()
         AuditEvent.objects.create(
@@ -115,11 +132,13 @@ def delete_cohort(request, cohort_key: str):
 
     return Response({"cohort_key": cohort_key, "documents_deleted": n_docs})
 
+
 @api_view(["GET"])
 def list_runs(request):
     cohort_key = request.query_params.get("cohort_key", "default")
     qs = AnalysisRun.objects.filter(cohort_key=cohort_key).order_by("-created_at")
     return Response(AnalysisRunSerializer(qs, many=True).data)
+
 
 @api_view(["POST"])
 def rerun(request, run_id: int):

@@ -17,4 +17,5 @@ urlpatterns = [
     path("runs/<int:run_id>/rerun/", views.rerun),
 
     path("cohorts/<str:cohort_key>/", views.delete_cohort),
+    path("health/", views.health),
 ]
