@@ -294,112 +294,121 @@ export default function CohortPage() {
 
   const meta = formatRunMeta(run);
 
-  return (
-  <div className="min-h-screen bg-neutral-950 text-neutral-100">
-    {/* Header */}
-    <header className="sticky top-0 z-10 border-b border-neutral-800 bg-neutral-950/80 backdrop-blur">
-      <div className="mx-auto max-w-6xl px-6 py-4 flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">Cohort Similarity Map</h1>
-            <p className="text-xs text-neutral-400">
-              Upload resumes → embed → UMAP projection → inspect clusters & herd phrases
-            </p>
+    return (
+    <div className="min-h-screen bg-neutral-950 text-neutral-100 antialiased">
+      {/* subtle depth */}
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,rgba(34,211,238,0.08),transparent_55%)]" />
+
+      {/* Header */}
+      <header className="sticky top-0 z-10 border-b border-neutral-800 bg-neutral-950/80 backdrop-blur">
+        <div className="mx-auto max-w-6xl px-6 py-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight">Cohort Similarity Map</h1>
+              <p className="text-xs text-neutral-400">
+                Upload resumes → embed → UMAP projection → inspect clusters & herd phrases
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {run ? (
+                <div className="flex items-center gap-2">
+                  {statusBadge(run.status)}
+                  <Badge>Run #{run.id}</Badge>
+                </div>
+              ) : (
+                <span className="text-xs text-neutral-500">No run selected</span>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            {run ? (
-              <div className="flex items-center gap-2">
-                {statusBadge(run.status)}
-                <Badge>
-                  Run #{run.id}
-                </Badge>
-              </div>
-            ) : (
-              <span className="text-xs text-neutral-500">No run selected</span>
-            )}
-          </div>
-        </div>
+          {/* Controls row */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div className="md:col-span-3">
+              <Label>Cohort key</Label>
+              <Input
+                value={cohortKey}
+                onChange={(e) => setCohortKey(e.target.value)}
+                placeholder="default"
+              />
+            </div>
 
-        {/* Controls row */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-          <div className="md:col-span-3">
-            <Label>Cohort key</Label>
-            <Input value={cohortKey} onChange={(e) => setCohortKey(e.target.value)} placeholder="default" />
-          </div>
-
-          <div className="md:col-span-3">
-            <Label>Run</Label>
-            <Select
-              value={run?.id ?? ""}
-              onChange={(e) => selectRun(Number(e.target.value))}
-              disabled={runsLoading || runs.length === 0}
-            >
-              <option value="" disabled>
-                {runsLoading ? "Loading runs..." : runs.length ? "Select a run" : "No runs yet"}
-              </option>
-              {runs.map((r) => (
-                <option key={r.id} value={r.id}>
-                  #{r.id} [{r.status}] {r.label ? `— ${r.label}` : ""}
+            <div className="md:col-span-3">
+              <Label>Run</Label>
+              <Select
+                value={run?.id ?? ""}
+                onChange={(e) => selectRun(Number(e.target.value))}
+                disabled={runsLoading || runs.length === 0}
+              >
+                <option value="" disabled>
+                  {runsLoading ? "Loading runs..." : runs.length ? "Select a run" : "No runs yet"}
                 </option>
-              ))}
-            </Select>
-          </div>
+                {runs.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    #{r.id} [{r.status}] {r.label ? `— ${r.label}` : ""}
+                  </option>
+                ))}
+              </Select>
+            </div>
 
-          <div className="md:col-span-2">
-            <Label>View</Label>
-            <Select value={view} onChange={(e) => setView(e.target.value as ViewSection)}>
-              <option value="doc">Full document</option>
-              <option value="skills">Skills only</option>
-              <option value="experience">Experience only</option>
-            </Select>
-          </div>
+            <div className="md:col-span-2">
+              <Label>View</Label>
+              <Select value={view} onChange={(e) => setView(e.target.value as ViewSection)}>
+                <option value="doc">Full document</option>
+                <option value="skills">Skills only</option>
+                <option value="experience">Experience only</option>
+              </Select>
+            </div>
 
-          <div className="md:col-span-2">
-            <Label>n_neighbors</Label>
-            <Input
-              type="number"
-              min={2}
-              max={200}
-              value={umapNeighbors}
-              onChange={(e) => setUmapNeighbors(Number(e.target.value))}
-              disabled={!run?.id}
-            />
-          </div>
+            <div className="md:col-span-2">
+              <Label>n_neighbors</Label>
+              <Input
+                type="number"
+                min={2}
+                max={200}
+                value={umapNeighbors}
+                onChange={(e) => setUmapNeighbors(Number(e.target.value))}
+                disabled={!run?.id}
+              />
+            </div>
 
-          <div className="md:col-span-2">
-            <Label>min_dist</Label>
-            <Input
-              type="number"
-              step={0.01}
-              min={0}
-              max={1}
-              value={umapMinDist}
-              onChange={(e) => setUmapMinDist(Number(e.target.value))}
-              disabled={!run?.id}
-            />
-          </div>
+            <div className="md:col-span-2">
+              <Label>min_dist</Label>
+              <Input
+                type="number"
+                step={0.01}
+                min={0}
+                max={1}
+                value={umapMinDist}
+                onChange={(e) => setUmapMinDist(Number(e.target.value))}
+                disabled={!run?.id}
+              />
+            </div>
 
-          <div className="md:col-span-12 flex items-center gap-2 flex-wrap pt-1">
-            <Button onClick={refreshDocs} variant="ghost">Refresh docs</Button>
-            <Button onClick={kickRun}>Start analysis</Button>
+            <div className="md:col-span-12 flex items-center gap-2 flex-wrap pt-1">
+              <Button onClick={refreshDocs} variant="ghost">
+                Refresh docs
+              </Button>
 
-            <Button
-              onClick={handleRerun}
-              disabled={!run?.id || run.status !== "done" || rerunBusy}
-              title={
-                !run?.id
-                  ? "Select a run first"
-                  : run.status !== "done"
-                  ? "Run must finish before rerunning with new UMAP params"
-                  : ""
-              }
-            >
-              {rerunBusy ? "Rerunning..." : "Rerun"}
-            </Button>
+              <Button onClick={kickRun} disabled={docs.length === 0}>
+                Start analysis
+              </Button>
 
-            <div className={canDelete ? "" : "opacity-60"}>
-              <div className="mt-4 border-t border-red-900/30 pt-4">
+              <Button
+                onClick={handleRerun}
+                disabled={!run?.id || run.status !== "done" || rerunBusy}
+                title={
+                  !run?.id
+                    ? "Select a run first"
+                    : run.status !== "done"
+                    ? "Run must finish before rerunning with new UMAP params"
+                    : ""
+                }
+              >
+                {rerunBusy ? "Rerunning..." : "Rerun"}
+              </Button>
+
+              <div className={canDelete ? "" : "opacity-60"}>
                 <DangerConfirm
                   label="Delete cohort"
                   warningTitle="Delete cohort permanently"
@@ -410,138 +419,152 @@ export default function CohortPage() {
                 />
               </div>
             </div>
-
-            {/* Errors in a consistent style */}
-            {runsError ? <span className="text-sm text-red-300">{runsError}</span> : null}
-            {rerunError ? <span className="text-sm text-red-300">{rerunError}</span> : null}
-            {deleteError ? <span className="text-sm text-red-300">{deleteError}</span> : null}
           </div>
         </div>
-      </div>
-    </header>
+      </header>
 
-    {/* Main */}
-    <main className="mx-auto max-w-6xl p-6 space-y-4">
-      {run?.id ? (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-3">
-          <div className="flex items-center gap-2">
-            {statusBadge(run.status)}
-            <span className="text-sm text-neutral-200">
-              Run <span className="text-neutral-100 font-medium">#{run.id}</span>
-            </span>
-            {meta ? (
-              <span className="text-xs text-neutral-500">
-                · {meta.model} · nn={meta.nn} md={meta.md}
+      {/* Main */}
+      <main className="mx-auto max-w-6xl p-6 space-y-4">
+        {/* Errors (kept simple so build never breaks) */}
+        {runsError ? <div className="text-sm text-red-300">{runsError}</div> : null}
+        {rerunError ? <div className="text-sm text-red-300">{rerunError}</div> : null}
+        {deleteError ? <div className="text-sm text-red-300">{deleteError}</div> : null}
+
+        {/* Run status strip */}
+        {run?.id ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-3">
+            <div className="flex items-center gap-2">
+              {statusBadge(run.status)}
+              <span className="text-sm text-neutral-200">
+                Run <span className="text-neutral-100 font-medium">#{run.id}</span>
               </span>
-            ) : null}
-          </div>
-          <div className="text-xs text-neutral-400">
-            {run.status === "running" ? "Processing…" : run.status === "queued" ? "Queued…" : run.status === "done" ? "Ready" : "Failed"}
-          </div>
-        </div>
-      ) : null}
-      <Card title="Upload documents">
-        <UploadBox
-          cohortKey={cohortKey}
-          onUploaded={async () => {
-            await refreshDocs();
-            await refreshRuns();
-          }}
-        />
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Scatter */}
-        <div className="lg:col-span-2">
-          <Card
-            title="Projection"
-            right={
-              <span className="text-xs text-neutral-400">
-                Docs: <span className="text-neutral-200">{docs.length}</span>
-                {run ? (
-                  <>
-                    {" "}· Run: <span className="text-neutral-200">#{run.id}</span>
-                  </>
-                ) : null}
-              </span>
-            }
-          >
-            {meta ? (
-              <div className="mb-3 text-xs text-neutral-400 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <div>
-                  <span className="text-neutral-500">Created</span>
-                  <div className="text-neutral-200">{meta.created}</div>
-                </div>
-                <div>
-                  <span className="text-neutral-500">Embedding</span>
-                  <div className="text-neutral-200">{meta.model}</div>
-                </div>
-                <div>
-                  <span className="text-neutral-500">UMAP</span>
-                  <div className="text-neutral-200">nn={meta.nn}, md={meta.md}</div>
-                </div>
-              </div>
-            ) : null}
-
-            {run?.error ? <div className="mb-3 text-sm text-red-300">{run.error}</div> : null}
-
-            {points.length ? (
-              <div className="h-[640px] rounded-xl overflow-hidden border border-neutral-800 bg-neutral-950/30">
-                <ScatterMap points={points} onSelect={(id) => setSelected(id)} />
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-950/30 p-10 text-sm text-neutral-400">
-                {run?.status === "done"
-                  ? `No points available for view "${view}". Try uploading more documents or switch views.`
-                  : "Upload documents and click “Start analysis” to generate the map."}
-              </div>
-            )}
-          </Card>
-        </div>
-
-        {/* Right panel */}
-        <div className="lg:col-span-1 space-y-4">
-          <Card
-            title="Inspector"
-            right={
-              run?.id ? (
-                <span className="text-xs text-neutral-400">Selected: {selected ?? "—"}</span>
-              ) : (
-                <span className="text-xs text-neutral-500">Start a run to enable</span>
-              )
-            }
-            className="h-[640px] flex flex-col"
-          >
-            <div className="shrink-0">
-              <Tabs
-                value={tab}
-                onChange={(v) => setTab(v as RightTab)}
-                options={[
-                  { value: "details", label: "Details" },
-                  {
-                    value: "herd",
-                    label: "Herd phrases",
-                    disabled: !run?.id || run.status !== "done",
-                    title: !run?.id || run.status !== "done" ? "Run an analysis to view herd phrases" : "",
-                  },
-                ]}
-              />
+              {meta ? (
+                <span className="text-xs text-neutral-500">
+                  · {meta.model} · nn={meta.nn} md={meta.md}
+                </span>
+              ) : null}
             </div>
+            <div className="text-xs text-neutral-400">
+              {run.status === "running"
+                ? "Processing…"
+                : run.status === "queued"
+                ? "Queued…"
+                : run.status === "done"
+                ? "Ready"
+                : "Failed"}
+            </div>
+          </div>
+        ) : null}
 
-            <div className="mt-4 grow overflow-auto pr-1">
-              {tab === "details" ? (
-                run?.id ? (
-                  <DocPanel runId={run.id} docId={selected} section={view} />
-                ) : (
-                  <div className="text-sm text-neutral-400">Start a run to enable details.</div>
-                )
+        <Card title="Upload documents">
+          <UploadBox
+            cohortKey={cohortKey}
+            onUploaded={async () => {
+              await refreshDocs();
+              await refreshRuns();
+            }}
+          />
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Scatter */}
+          <div className="lg:col-span-2">
+            <Card
+              title="Projection"
+              right={
+                <span className="text-xs text-neutral-400">
+                  Docs: <span className="text-neutral-200">{docs.length}</span>
+                  {run ? (
+                    <>
+                      {" "}
+                      · Run: <span className="text-neutral-200">#{run.id}</span>
+                    </>
+                  ) : null}
+                </span>
+              }
+            >
+              {meta ? (
+                <div className="mb-3 text-xs text-neutral-400 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div>
+                    <span className="text-neutral-500">Created</span>
+                    <div className="text-neutral-200">{meta.created}</div>
+                  </div>
+                  <div>
+                    <span className="text-neutral-500">Embedding</span>
+                    <div className="text-neutral-200">{meta.model}</div>
+                  </div>
+                  <div>
+                    <span className="text-neutral-500">UMAP</span>
+                    <div className="text-neutral-200">
+                      nn={meta.nn}, md={meta.md}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {run?.error ? <div className="mb-3 text-sm text-red-300">{run.error}</div> : null}
+
+              {points.length ? (
+                <div className="h-[640px] rounded-xl overflow-hidden border border-neutral-800 bg-neutral-950/30">
+                  <ScatterMap points={points} onSelect={(id) => setSelected(id)} />
+                </div>
               ) : (
-                <HerdPanel herd={herd} loading={herdLoading} error={herdError} />
+                <div className="rounded-xl border border-dashed border-neutral-700 bg-neutral-950/30 p-10 text-sm text-neutral-400">
+                  {run?.status === "done"
+                    ? `No points available for view "${view}". Try uploading more documents or switch views.`
+                    : "Upload documents and click “Start analysis” to generate the map."}
+                </div>
               )}
-            </div>
-          </Card>
+            </Card>
+          </div>
+
+          {/* Right panel */}
+          <div className="lg:col-span-1 space-y-4">
+            <Card
+              title="Inspector"
+              right={
+                run?.id ? (
+                  <span className="text-xs text-neutral-400">Selected: {selected ?? "—"}</span>
+                ) : (
+                  <span className="text-xs text-neutral-500">Start a run to enable</span>
+                )
+              }
+              className="h-[640px] flex flex-col"
+            >
+              <div className="shrink-0">
+                <Tabs
+                  value={tab}
+                  onChange={(v) => setTab(v as RightTab)}
+                  options={[
+                    { value: "details", label: "Details" },
+                    {
+                      value: "herd",
+                      label: "Herd phrases",
+                      disabled: !run?.id || run.status !== "done",
+                      title:
+                        !run?.id || run.status !== "done"
+                          ? "Run an analysis to view herd phrases"
+                          : "",
+                    },
+                  ]}
+                />
+              </div>
+
+              <div className="mt-4 grow overflow-auto pr-1">
+                {tab === "details" ? (
+                  run?.id ? (
+                    <DocPanel runId={run.id} docId={selected} section={view} />
+                  ) : (
+                    <div className="text-sm text-neutral-400">Start a run to enable details.</div>
+                  )
+                ) : (
+                  <HerdPanel herd={herd} loading={herdLoading} error={herdError} />
+                )}
+              </div>
+            </Card>
+          </div>
         </div>
-      </div>
-    </main>
-  </div>
-);
+      </main>
+    </div>
+  );
+}
