@@ -11,11 +11,11 @@ import {
   listRuns,
   rerun,
 } from "../api/client";
-import { UploadBox } from "../../components/UploadBox";
-import { ScatterMap } from "../../components/ScatterMap";
-import { DocPanel } from "../../components/DocPanel";
-import { HerdPanel } from "../../components/HerdPanel";
-import { DangerConfirm } from "../../components/DangerConfirm";
+import { UploadBox } from "../components/UploadBox";
+import { ScatterMap } from "../components/ScatterMap";
+import { DocPanel } from "../components/DocPanel";
+import { HerdPanel } from "../components/HerdPanel";
+import { DangerConfirm } from "../components/DangerConfirm";
 
 type ViewSection = "doc" | "skills" | "experience";
 type RightTab = "details" | "herd";
